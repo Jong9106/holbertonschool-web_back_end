@@ -15,9 +15,7 @@ async def wait_n(n: int, max_delay: int) -> List[float]:
     max_delay and n.
     You will spawn wait_random n times with the specified max_delay.
     """
-    fcts = [
-        wait_random(max_delay) for i in range(n)
-    ]
+    fcts = [wait_random(max_delay) for i in range(n)]
     rs = []
     for x in asyncio.as_completed(fcts):
         r = await x
