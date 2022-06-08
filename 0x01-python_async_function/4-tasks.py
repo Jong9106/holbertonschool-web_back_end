@@ -15,11 +15,10 @@ async def task_wait_n(n: int, max_delay: int) -> List[float]:
     Call wait_random n times
     '''
 
-    result = []
-
     delays = [task_wait_random(max_delay) for time in range(n)]
 
+    rs = []
     for sort in asyncio.as_completed(delays):
         val = await sort
-        result.append(val)
-    return result
+        rs.append(val)
+    return rs
