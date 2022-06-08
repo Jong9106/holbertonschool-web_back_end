@@ -1,26 +1,25 @@
 #!/usr/bin/env python3
-
-'''
-Let's execute multiple coroutines at the same time with async
-'''
+""" asynchronous coroutine """
 
 import asyncio
 import random
 from typing import List
+
 wait_random = __import__('0-basic_async_syntax').wait_random
 
 
 async def wait_n(n: int, max_delay: int) -> List[float]:
-    '''
-    Call wait_random n times
-    '''
-    result = []
-
-    # List of wait_random done n times
-    delays = [wait_random(max_delay) for time in range(n)]
-
-    # Loop delays in order of completion
-    for sort in asyncio.as_completed(delays):
-        val = await sort
-        result.append(val)
-    return result
+    """
+    async routine called wait_n
+    that takes in 2 int arguments:
+    max_delay and n.
+    You will spawn wait_random n times with the specified max_delay.
+    """
+    fcts = [
+        wait_random(max_delay) for i in range(n)
+    ]
+    rs = []
+    for x in asyncio.as_completed(fcts):
+        r = await x
+        rs.append(r)
+    return rs
