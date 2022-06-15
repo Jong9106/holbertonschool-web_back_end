@@ -63,4 +63,4 @@ class Server:
             'page_size': len(pages),
             'next_index': max(idx) + 1
         }
-        return 
+        return
