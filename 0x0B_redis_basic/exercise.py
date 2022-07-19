@@ -1,82 +1,86 @@
 #!/usr/bin/env python3
-
-""" Cache class
+""" Redis exercises module
 """
-
 import redis
-from typing import Callable, Optional, Union
-from uuid import uuid4
+from typing import Union, Callable, List, Optional
+import uuid
+import sys
 from functools import wraps
 
 
 def count_calls(method: Callable) -> Callable:
-    """ Counts how many times methods of Cache class are called
-    """
-    method_name = method.__qualname__
+    """ Count amount of calls to method """
+    key = method.__qualname__
 
     @wraps(method)
-    def wrapper(self, *args, **kwargs):
-        """ Increment method call number
-        """
-        self._redis.incr(method_name)
+    def counter_wrapper(self, *args, **kwargs):
+        """ Wrapper for method """
+        self._redis.incr(key)
         return method(self, *args, **kwargs)
-
-    return wrapper
+    return counter_wrapper
 
 
 def call_history(method: Callable) -> Callable:
-    """ Stores history of inputs and outputs for a particular function
-    """
-    qualified_name = method.__qualname__
+    """ Store history of inputs and outputs for a function """
+    input_list_key = method.__qualname__ + ":inputs"
+    output_list_key = method.__qualname__ + ":outputs"
 
     @wraps(method)
-    def wrapper(self, *args, **kwargs):
-        """ Add call_history params to one list in Redis
-            and store its ouput in anoter list
-        """
-        self._redis.rpush(qualified_name + ':inputs', str(args))
-        self._redis.rpush(
-            qualified_name + ':outputs',
-            method(self, *args, **kwargs)
-        )
-        return method(self, *args, **kwargs)
-    return wrapper
+    def set_history(self, *args, **kwargs):
+        """ Set list keys to wrapped function """
+        self._redis.rpush(input_list_key, str(args))
+        res = method(self, *args, **kwargs)
+        self._redis.rpush(output_list_key, str(res))
+        return res
+
+    return set_history
+
+
+def replay(method: Callable) -> None:
+    """ Ouput log of actions taken on method """
+    key = method.__qualname__
+    inputs = key + ":inputs"
+    outputs = key + ":outputs"
+    redis = method.__self__._redis
+    count = redis.get(key).decode("utf-8")
+    print(f"{key} was called {count} times:")
+    in_list = redis.lrange(inputs, 0, -1)
+    out_list = redis.lrange(outputs, 0, -1)
+    redis_zipped = list(zip(in_list, out_list))
+    for a, b in redis_zipped:
+        attr, result = a.decode("utf-8"), b.decode("utf-8")
+        print(f"{key}(*{attr}) -> {result}")
 
 
 class Cache:
-    """ Cache class stores instance of the Redic client
+    """ Cache class
     """
-
     def __init__(self):
-        """ Initalizee for Cache class
-        """
-        self._redis = redis.Redis()
+        """ Instantiate Redis """
+        self._redis = redis.Redis(host="localhost", port=6379)
         self._redis.flushdb()
 
     @call_history
     @count_calls
     def store(self, data: Union[str, bytes, int, float]) -> str:
-        """ Generates a random uuid
-        """
-        unique_id = str(uuid4)
-        self._redis.set(unique_id, data)
-        return unique_id
+        """ Store any type of data in Redis """
+        key = str(uuid.uuid4())
+        self._redis[key] = data
+        return key
 
-    def get(self, key: str, fn: Optional[Callable]
-            = None) -> Union[str, bytes, int, float]:
-        """ Converts data back to desired format
-        """
-        data = self._redis.get(key)
-        if fn:
-            data = fn(data)
-        return data
+    def get(self, key: str, fn: Optional[Callable] = None) ->\
+            Union[str, bytes, int, float]:
+        """ Get value in db, convert data back to desired format """
+        return fn(self._redis.get(key)) if fn else self._redis.get(key)
 
-    def get_str(self, key: str) -> Union[str, bytes, int, float]:
-        """ Converts data back to desired string format
-        """
-        return self.get(key, str)
+    def get_str(self, b: bytes) -> str:
+        """ Convert bytes to str """
+        return b.decode('utf-8')
 
-    def get_int(self, key: str) -> Union[str, bytes, int, float]:
-        """ Converts data back to desired int format
-        """
-        return self.get(key, int)
+    def get_int(self, b: bytes) -> int:
+        """ Convert bytes to int """
+        return int.from_bytes(b, sys.byteorder)
+
+    def get_list(self, k: str) -> List:
+        """ Convert bytes from store to list """
+        return self._redis.lrange(k, 0, -1)
