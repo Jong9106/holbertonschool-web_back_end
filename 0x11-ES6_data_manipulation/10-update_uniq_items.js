@@ -6,4 +6,3 @@ export default function updateUniqueItems(_map) {
   
 	return _map;
   }
-  
